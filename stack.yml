@@ -1,0 +1,177 @@
+version: '3.7'
+
+networks:
+  web_net:
+    driver: bridge
+    #ipam:
+    #  config:
+    #    - subnet: 192.168.33.0/24
+
+services:
+  web:
+    image: nginx:alpine
+    restart: always
+    depends_on:
+      - api
+    ports:
+      - 80:80
+    volumes:
+      - './src/web/:/www/'
+      - './etc/nginx/conf.d:/etc/nginx/conf.d'
+      - './etc/nginx/nginx.conf:/etc/nginx/nginx.conf'
+      - './etc/localtime:/etc/localtime:ro'
+    networks:
+      - web_net
+
+  api:
+    image: api:latest
+    build:
+      context: .
+      target: api
+    restart: always
+    networks:
+      - web_net
+    ports:
+      - 3000:3000
+    depends_on:
+      - mysql
+      - redis
+      - mongo
+    volumes:
+      - './src/api:/go/src/app'
+      - './etc/localtime:/etc/localtime:ro'
+    environment:
+      TZ: Asia/Shanghai
+
+  job:
+    image: job:latest
+    build:
+      context: .
+      target: job
+    restart: always
+    networks:
+      - web_net
+    depends_on:
+      - mysql
+      - redis
+      - mongo
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - './src/api:/go/src/app'
+      - './src/job:/home/job'
+      - './etc/localtime:/etc/localtime:ro'
+
+  crontab:
+    image: crontab:latest
+    build:
+      context: .
+      target: crontab
+    restart: always
+    networks:
+      - web_net
+    depends_on:
+      - mysql
+      - redis
+      - mongo
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - './etc/localtime:/etc/localtime:ro'
+      - './src/job/config.json:/opt/crontab/config.json:rw'
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+
+  python3:
+    image: python3:latest
+    build:
+      context: .
+      target: python3
+    restart: always
+    networks:
+      - web_net
+    ports:
+      - 5000:5000
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - './src/py3:/usr/src/app'
+      - './etc/localtime:/etc/localtime:ro'
+
+  mysql:
+    image: mysql:8
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always
+    environment:
+      MYSQL_ROOT_HOST: '%'
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_USER: webapp
+      MYSQL_PASSWORD: 1234
+      MYSQL_DATABASE: webapp
+      TZ: Asia/Shanghai
+    ports:
+      - 33060:3306
+    networks:
+      - web_net
+    volumes:
+      - './data/mysql:/var/lib/mysql'
+      - './src/sql:/docker-entrypoint-initdb.d'
+      - './etc/localtime:/etc/localtime:ro'
+
+  dbadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    depends_on:
+      - mysql
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: webapp
+      PMA_PASSWORD: 1234
+      TZ: Asia/Shanghai
+    networks:
+      - web_net
+
+  redis:
+    hostname: redis
+    image: redis:5-alpine
+    restart: always
+    networks:
+      - web_net
+    environment:
+      TZ: Asia/Shanghai
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    restart: always
+    networks:
+      - web_net
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      TZ: Asia/Shanghai
+
+  mongo:
+    image: mongo:latest
+    restart: always
+    networks:
+      - web_net
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 1234
+      TZ: Asia/Shanghai
+    volumes:
+      - './data/mongo:/data/db'
+      - './src/sql:/docker-entrypoint-initdb.d'
+      - './etc/localtime:/etc/localtime:ro'
+
+  mongo-express:
+    image: mongo-express:latest
+    restart: always
+    networks:
+      - web_net
+    depends_on:
+      - mongo
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: 1234
+      TZ: Asia/Shanghai

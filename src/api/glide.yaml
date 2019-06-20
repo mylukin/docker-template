@@ -1,0 +1,10 @@
+package: .
+import:
+  - package: github.com/gin-gonic/gin
+    version: ~1.4.0
+  - package: github.com/go-sql-driver/mysql
+    version: ~1.4.1
+  - package: go.mongodb.org/mongo-driver
+    version: ~1.0.2
+    subpackages:
+      - mongo

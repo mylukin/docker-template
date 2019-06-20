@@ -1,0 +1,9 @@
+[
+  {
+    "comment": "python main.py",
+    "schedule": "@daily",
+    "command": "bash -c 'python main.py",
+    "project": "qiming",
+    "container": "python3"
+  }
+]
